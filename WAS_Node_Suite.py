@@ -46,6 +46,9 @@ import datetime
 import time
 import torch
 from tqdm import tqdm
+from urllib.parse import quote
+import logging
+
 
 p310_plus = (sys.version_info >= (3, 10))
 
@@ -7354,6 +7357,7 @@ class WAS_Image_Save:
             if not os.path.exists(output_path.strip()):
                 cstr(f'The path `{output_path.strip()}` specified doesn\'t exist! Creating directory.').warning.print()
                 os.makedirs(output_path, exist_ok=True)
+                logging.info(f"Output directory ensured at: {output_path}")
 
         # Find existing counter values
         if filename_number_start == 'true':
@@ -7450,6 +7454,62 @@ class WAS_Image_Save:
                 cstr(f"Image file saved to: {output_file}").msg.print()
                 output_files.append(output_file)
 
+                # Below code we added - Corrected Version
+                try:
+                    # Image generation logic here
+                    logging.info("Starting download URLs generation.")
+
+                    # Assuming 'output_files' is already populated in the outer try block
+                    # and contains the paths to the generated images.
+
+                    # Populate 'images' list based on 'output_files'
+                    images = [os.path.basename(file) for file in output_files]  # Example; adjust as needed
+
+                    logging.info(f"Image generation completed. Output files: {output_files}")
+
+                    # Generate download URLs
+                    download_urls = []
+                    for output_file in output_files:
+                        # Ensure the output_file is an absolute path
+                        if not os.path.isabs(output_file):
+                            output_file = os.path.abspath(output_file)
+                            logging.warning(f"Converted to absolute path: {output_file}")
+
+                        # URL-encode the image_path
+                        # Replace backslashes with forward slashes for URL compatibility
+                        image_path_encoded = quote(output_file.replace('\\', '/'))
+                        # Construct the download URL
+                        download_url = f"/download_image?image_path={image_path_encoded}"
+                        download_urls.append(download_url)
+                        logging.info(f"Download URL created: {download_url}")
+
+                    # Prepare the response
+                    response = {
+                        "ui": {
+                            "images": images,  # Adjust as per actual data structure
+                            "files": output_files,
+                            "download_urls": download_urls  # Ensure this line is present
+                        },
+                        "result": (images, output_files,)
+                    }
+
+                    logging.info(f"Response prepared with download URLs: {download_urls}")
+
+                    return response
+
+                except Exception as e:
+                    logging.error(f"Error during execution: {e}")
+                    # Handle exception as per your application's requirements
+                    return {
+                        "ui": {
+                            "images": [],
+                            "files": [],
+                            "download_urls": []
+                        },
+                        "result": ([], [])
+                    }
+                # above code
+
                 if show_history != 'true' and show_previews == 'true':
                     subfolder = self.get_subfolder_path(output_file, original_output)
                     results.append({
@@ -7513,6 +7573,7 @@ class WAS_Image_Save:
         else:
             return {"ui": {"images": []}, "result": (images, output_files,)}
 
+        
     def get_subfolder_path(self, image_path, output_path):
         output_parts = output_path.strip(os.sep).split(os.sep)
         image_parts = image_path.strip(os.sep).split(os.sep)
@@ -13853,6 +13914,31 @@ class WAS_Video_Writer:
             path = MP4Writer.write(new_image, output_file)
 
             results.append(img)
+        images = [os.path.basename(file) for file in output_files]
+        logging.info(f"Image generation completed. Output files: {output_files}")
+        download_urls = []
+        for output_file in output_files:
+            if not os.path.isabs(output_file):
+                output_file = os.path.abspath(output_file)
+                logging.warning(f"Converted to absolute path: {output_file}")
+
+            image_path_encoded = quote(output_file.replace('\\', '/'))
+            download_url = f"/download_image?image_path={image_path_encoded}"
+            download_urls.append(download_url)
+            logging.info(f"Download URL created: {download_url}")
+
+        # Prepare the response
+        response = {
+            "ui": {
+                "images": images,
+                "files": output_files,
+                "download_urls": download_urls
+            },
+            "result": [images, output_files]
+        }
+
+        logging.info(f"Response prepared with download URLs: {download_urls}")
+
 
         return (torch.cat(results, dim=0), path, filename)
 
